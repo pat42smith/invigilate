@@ -1,0 +1,9 @@
+# Copyright 2022 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+#
+# A trivial test case with error output.
+
+echo Oops >&2
+#!Oops
+
+exit 1

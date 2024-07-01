@@ -1,0 +1,9 @@
+# Copyright 2024 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# Check for too much error output.
+
+#!That's wrong!
+
+echo "That's wrong!" >&2
+echo "Yes, it is!" >&2

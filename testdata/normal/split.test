@@ -1,0 +1,10 @@
+# Copyright 2022 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# Test with output line split into pieces.
+
+printf "Hello, "
+/bin/sleep 0.3
+printf "world!\n"
+
+#>Hello, world!

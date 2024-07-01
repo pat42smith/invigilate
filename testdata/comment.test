@@ -1,0 +1,19 @@
+# Copyright 2024 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+#
+# This test passes with "###" as the comment delimiter for setting expectations,
+# but fails with " #".
+
+read x
+###<foo
+ #<bar
+
+echo $x
+###>foo
+ #>bar
+
+echo oops >&2
+###!oops
+ #!error
+
+exit 9

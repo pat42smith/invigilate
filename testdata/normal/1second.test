@@ -1,0 +1,10 @@
+# Copyright 2022 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# The default time out is 2 seconds, so this should pass easily.
+# But it might fail sporadically on a heavily loaded system.
+
+/bin/sleep 1
+
+echo 'Boo!'
+#>Boo!

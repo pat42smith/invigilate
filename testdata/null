@@ -1,0 +1,4 @@
+# Copyright 2022 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+#
+# The trivial test case - does nothing (in sh, anyway).

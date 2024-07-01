@@ -1,0 +1,9 @@
+# Copyright 2024 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# Check for too much output.
+
+#>alpha
+
+echo alpha
+echo beta

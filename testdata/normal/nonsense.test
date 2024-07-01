@@ -1,0 +1,59 @@
+# Copyright 2022 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# A test with mixed input and output.
+
+while :; do
+   read which
+   case "$which" in
+      Jabberwocky)
+         echo Twas brillig, and the slithy toves
+         echo Did gyre and gimble in the wabe\;
+         echo All mimsy were the borogoves,
+         echo And the mome raths outgrabe.
+         ;;
+      lavish)
+         echo No McTavish
+         echo Was ever lavish
+         ;;
+      Aosta)
+         echo There was an Old Man of Aosta
+         echo Who possessed a large Cow, but he lost here\;
+         echo But they said, \"Don\'t you see she has run up a tree,
+         echo You invidious Old Man of Aosta\?\"
+         ;;
+      Seuss)
+         echo You\'re wrong as the deuce
+         echo And you shouldn\'t rejoice
+         echo If you\'re calling him Seuss.
+         echo He pronounces it Soice \(or Zoice\)
+         ;;
+      *)
+         exit 0
+         ;;
+   esac
+done
+
+#<lavish
+#>No McTavish
+#>Was ever lavish
+
+#<Seuss
+#>You're wrong as the deuce
+#>And you shouldn't rejoice
+#>If you're calling him Seuss.
+#>He pronounces it Soice (or Zoice)
+
+#<Jabberwocky
+#>Twas brillig, and the slithy toves
+#>Did gyre and gimble in the wabe;
+#>All mimsy were the borogoves,
+#>And the mome raths outgrabe.
+
+#<Aosta
+#>There was an Old Man of Aosta
+#>Who possessed a large Cow, but he lost here;
+#>But they said, "Don't you see she has run up a tree,
+#>You invidious Old Man of Aosta?"
+
+#<done

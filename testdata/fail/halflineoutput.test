@@ -1,0 +1,7 @@
+# Copyright 2023 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# What if the output stops prematurely in the middle of a line?
+
+#>Bobolink
+printf "Bob"

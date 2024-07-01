@@ -1,0 +1,7 @@
+# Copyright 2023 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# This test fails with incorrect error output.
+
+echo "Blimey!" >&2
+#!Nonsense!

@@ -1,0 +1,7 @@
+# Copyright 2022 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# A trivial test of invigilate with output.
+
+echo "Hello, world!"
+#>Hello, world!

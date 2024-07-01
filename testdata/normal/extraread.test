@@ -1,0 +1,16 @@
+# Copyright 2024 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# Check for reading input that was not supplied.
+# In general, this may or may not cause the test case to fail,
+# depending on whether the code in the test case is prepared to handle this case.
+
+#>Say something
+
+echo Say something
+read s || {
+   echo "no input" >&2
+   exit 9
+}
+
+#!no input
