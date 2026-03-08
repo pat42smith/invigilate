@@ -1,4 +1,4 @@
-# Copyright 2024 Patrick Smith
+# Copyright 2024-2026 Patrick Smith
 # Use of this source code is subject to the MIT-style license in the LICENSE file.
 #
 # Test the results from running invigilate in verbose mode when some tests fail.
