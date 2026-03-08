@@ -10,7 +10,7 @@
 # Note that when this is run, the current directory will be the main directory
 # of the invigilate package.
 
-$INVIGILATE -v /bin/sh -- testdata/mix
+$INVIGILATE -v sh -- testdata/mix
 
 #>
 #>testdata/mix/anteater.test

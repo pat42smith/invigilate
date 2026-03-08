@@ -4,7 +4,7 @@
 # Test with output line split into pieces.
 
 printf "Hello, "
-/bin/sleep 0.3
+sleep 0.3
 printf "world!\n"
 
 #>Hello, world!
