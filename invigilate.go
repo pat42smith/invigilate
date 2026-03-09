@@ -68,6 +68,11 @@ standard output and standard error. A test such as:
 
 will probably succeed.
 
+Invigilate will close the standard input for the test case after it processes
+the last #< line. If there are no #< lines, standard input will be closed
+immediately after the test case is started. This allows a test case to use
+EOF on standard input as an indication to terminate.
+
 In addition to input and output, invigilate checks the exit code from the test
 process. If no output on standard error is expected, then a 0 exit code is
 expected. Otherwise, any non-0 exit code is accepted.
