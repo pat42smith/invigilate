@@ -1,0 +1,11 @@
+These are some possible additional features.
+However, I want to keep this simple, and am wary of feature creep.
+
+Option to run tests in parallel (-j?).
+- Would require code changes to avoid race conditions.
+
+#? to specify expected exit code.
+
+#=VAR=value to set environment variables.
+
+#- options/arguments (to be appended to the command being tested)

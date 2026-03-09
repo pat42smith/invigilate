@@ -27,6 +27,7 @@ func TestAll(t *testing.T) {
 	t.Run("Help", func(t2 *testing.T) { Help(t2, ex) })
 	t.Run("Error", func(t2 *testing.T) { Error(t2, ex) })
 	t.Run("Testee", func(t2 *testing.T) { Testee(t2, ex) })
+	t.Run("Children", func(t2 *testing.T) { Children(t2, ex) })
 }
 
 // Test some invocations with default arguments.
@@ -245,4 +246,14 @@ func Error(t *testing.T, invig string) {
 // Test something other than sh
 func Testee(t *testing.T, invig string) {
 	gotest.Command(invig, "awk", "-f", "--", "testdata/sum.test").Run(t, "")
+}
+
+// Check test cases spawning child processes
+func Children(t *testing.T, invig string) {
+	gotest.Command(invig, "sh", "--", "testdata/shortchild.test").Run(t, "")
+
+	cmd := gotest.Command(invig, "sh", "--", "testdata/longchild.test")
+	cmd.WantStderr("testdata/longchild.test: time limit exceeded\n1 failed tests\n")
+	cmd.WantCode(1)
+	cmd.Run(t, "")
 }

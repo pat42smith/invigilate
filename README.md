@@ -1,10 +1,19 @@
-# Go tests
-
-[![Go Reference](https://pkg.go.dev/badge/github.com/pat42smith/invigilate.svg)](https://pkg.go.dev/github.com/pat42smith/invigilate)
+# Invigilate - a simple test case runner
 
 Invigilate is a tool for running test cases. It allows testing a single program by running
-several test cases against it. Each test case is contained in a single file, which contains
-instructions describing the expected output from the test case.
+several test cases against the program.
+Each test case is contained in a single file, which contains
+instructions describing the expected output from the test case. For example,
+here is a small test case that expects to be run with /bin/sh:
+
+```
+echo "Hello, world!"
+#>Hello, world!
+```
+
+The comment line beginning with `#>` specifies what should be printed when the test is run.
+
+For more information, run `invigilate -h`.
 
 Use standard Go tools to build invigilate, such as 'go build' or 'go install'.
 

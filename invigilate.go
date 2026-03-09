@@ -1,9 +1,10 @@
-// Copyright 2024 Patrick Smith
+// Copyright 2024-2026 Patrick Smith
 // Use of this source code is subject to the MIT-style license in the LICENSE file.
 
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -24,25 +25,57 @@ Usage: invigilate [options] program -- files
 
 Program invigilate runs a number of test cases against a single program.
 
-The arguments between the last option and the "--" describe the program to be tested.
+The arguments between the last option and the "--" describe the program
+to be tested.
 
-The arguments after "--" list files containing test cases. If one of these arguments
-refers to a directory, the directory will be searched (recursively) for regular files
-with the extension given by the -e option; these will be used as test cases.
-Test case files listed directly in the command line do not need to end with
-the extension given with -e.
+The arguments after "--" list files containing test cases. If one of these
+arguments refers to a directory, the directory will be searched (recursively)
+for regular files with the extension given by the -e option; these will be
+used as test cases. Test case files listed directly in the command line do not
+need to end with the extension given with -e.
 
-The program being tested is run once for each test case. The command line consists
-of the "program" part of the invigilate arguments, followed by one additional
-argument, the path to the file containing the test case.
+The program being tested is run once for each test case. The command line
+consists of the "program" part of the invigilate arguments, followed by one
+additional argument, the path to the file containing the test case.
 
-The expected results of a test case are described in comments embedded in the test file.
-A line beginning with "#>" means that the remainder of the line should appear on standard
-output; "#!", that the remainder should appear on the standard error output; and "#<",
-that the remainder should be supplied to standard input. All of these are expected to
-be produced or consumed in the order in which they appear in the test file. The -c option
-may be used to specify another comment delimiter instead of "#", but the delimiter
-must always appear at the beginning of a line.
+The expected results of a test case are described in comments embedded in the
+test file. A line beginning with "#>" means that the remainder of the line
+should appear on standard output; "#!", that the remainder should appear on the
+standard error output; and "#<", that the remainder should be supplied to
+standard input. The newline character terminating each such line is included in
+the input or expected output. The -c option may be used to specify another
+comment delimiter instead of "#", but the delimiter must always appear at the
+beginning of a line.
+
+Invigilate processes #>, #!, and #< directives in the order in which they
+appear in the test file. So a test case such as (using sh):
+
+   read value
+   echo prompt
+   #>prompt
+   #<something
+
+will hang until the time limit runs out, as both invigilate and the test case
+will be trying to read from each other.
+
+Note that invigilate cannot guarantee the relative ordering of output to
+standard output and standard error. A test such as:
+
+   echo one
+   echo two >&2
+   #>two
+   #!one
+
+will probably succeed.
+
+In addition to input and output, invigilate checks the exit code from the test
+process. If no output on standard error is expected, then a 0 exit code is
+expected. Otherwise, any non-0 exit code is accepted.
+
+When the time limit for a test case runs out, invigilate tries to kill the test
+process and proceed with other test cases. If the test case has created a
+long-lived child process, the child process might be left running even after
+invigilate has finished running the full test suite.
 
 Options:
 
@@ -90,7 +123,7 @@ func main() {
 	flag.StringVar(&comment, "c", "#", "comment delimiter for expected input and output")
 	flag.StringVar(&extension, "e", ".test", "test case files have this extension")
 	flag.BoolVar(&help, "h", false, "print this help information")
-	flag.DurationVar(&limit, "t", 2 * time.Second, "time limit for individual test cases")
+	flag.DurationVar(&limit, "t", 2*time.Second, "time limit for individual test cases")
 	flag.BoolVar(&verbose, "v", false, "show verbose output")
 	flag.CommandLine.Usage = usage
 	flag.Parse()
@@ -104,7 +137,7 @@ func main() {
 	for k, a := range flag.Args() {
 		if a == "--" {
 			// Allocate a spot for a test name in the program's command line
-			program = make([]string, k, k + 1)
+			program = make([]string, k, k+1)
 			copy(program, flag.Args()[:k])
 			roots = flag.Args()[k+1:]
 		}
@@ -144,7 +177,7 @@ func main() {
 }
 
 // findTests finds the test cases to be executed
-func findTests(roots []string, ch chan <-Test) {
+func findTests(roots []string, ch chan<- Test) {
 	for _, r := range roots {
 		info, e := os.Lstat(r)
 		if e != nil {
@@ -173,7 +206,7 @@ func findTests(roots []string, ch chan <-Test) {
 }
 
 // reportTest lists one test case that should be executed
-func reportTest(path string, ch chan <-Test) {
+func reportTest(path string, ch chan<- Test) {
 	content, e := os.ReadFile(path)
 	if e != nil {
 		ch <- Test{path, "", e}
@@ -182,15 +215,12 @@ func reportTest(path string, ch chan <-Test) {
 	ch <- Test{path, string(content), nil}
 }
 
-// Type Deadliner has os.File.SetDeadline
-type Deadliner interface {
-	SetDeadline(time.Time) error
-}
-
 // runTest runs a single test case
 func runTest(t Test, program []string) {
-	cmd := exec.Command(program[0], append(program[1:], t.path)...)
-	deadline := time.Now().Add(limit)
+	ctx, cancel := context.WithTimeout(context.Background(), limit)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, program[0], append(program[1:], t.path)...)
 
 	var iPipe io.WriteCloser
 	var oPipe, ePipe io.ReadCloser
@@ -216,27 +246,27 @@ func runTest(t Test, program []string) {
 		pipeError("opening input pipe", e)
 		return
 	}
-	if e = iPipe.(Deadliner).SetDeadline(deadline); e != nil {
-		pipeError("setting input deadline", e)
-		return
-	}
-
 	if oPipe, e = cmd.StdoutPipe(); e != nil {
 		pipeError("opening output pipe", e)
 		return
 	}
-	if e = oPipe.(Deadliner).SetDeadline(deadline); e != nil {
-		pipeError("setting output deadline", e)
-		return
-	}
-
 	if ePipe, e = cmd.StderrPipe(); e != nil {
 		pipeError("opening error output pipe", e)
 		return
 	}
-	if e = ePipe.(Deadliner).SetDeadline(deadline); e != nil {
-		pipeError("setting error output deadline", e)
-		return
+
+	// If we cancel the command (e.g. because of a timeout), we need to close the pipes,
+	// so the reads and writes below will terminate. This guards against the case
+	// where a test process spawns a child that still has its end of the pipes open;
+	// killing the test process doesn't kill the child. By closing our end of the pipes,
+	// we can proceed to other test cases, no matter how long the child hangs around.
+	oldCmdCancel := cmd.Cancel // Should kill the test process
+	cmd.Cancel = func() error {
+		oldCmdCancel()
+		iPipe.Close()
+		oPipe.Close()
+		ePipe.Close()
+		return nil
 	}
 
 	// From here on, cmd.Start and cmd.Wait will close the pipes for us.
@@ -258,18 +288,11 @@ func runTest(t Test, program []string) {
 		iPipe.Close()
 		oPipe.Close()
 		ePipe.Close()
-		go func(cmd *exec.Cmd) {
-			time.Sleep(50 * time.Millisecond)
-			if cmd.Process != nil {
-				cmd.Process.Kill()
-			}
-			cmd.Wait()
-		}(cmd)
-		cmd = nil
+		cancel()
 	}
 
 	faile := func(msg string, e error) {
-		if errors.Is(e, os.ErrDeadlineExceeded) {
+		if errors.Is(e, os.ErrClosed) {
 			log.Printf("%s: time limit exceeded", t.path)
 		} else if e != nil {
 			log.Printf("%s: %s: %s", t.path, msg, e)
@@ -279,7 +302,7 @@ func runTest(t Test, program []string) {
 
 	buf := make([]byte, 65536)
 	expect := func(pipe io.ReadCloser, what, want string, got *string) bool {
-		for same, done := 0, false;; {
+		for same, done := 0, false; ; {
 			for same < len(want) && same < len(*got) {
 				if want[same] == (*got)[same] {
 					same++
@@ -311,7 +334,7 @@ func runTest(t Test, program []string) {
 			if e == io.EOF {
 				done = true
 			} else if e != nil {
-				faile("reading " + what, e)
+				faile("reading "+what, e)
 				return false
 			}
 		}
@@ -336,7 +359,7 @@ func runTest(t Test, program []string) {
 			}
 			reads = -1
 		}
-		if !strings.HasPrefix(line, comment) || len(line) < len(comment) + 2 {
+		if !strings.HasPrefix(line, comment) || len(line) < len(comment)+2 {
 			continue
 		}
 		line = line[len(comment):]
@@ -424,10 +447,18 @@ func runTest(t Test, program []string) {
 
 	code := 0
 	if e := cmd.Wait(); e != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			log.Printf("%s: time limit exceeded", t.path)
+			failCount++
+			return
+		}
+
 		if ee, ok := e.(*exec.ExitError); ok {
 			code = ee.ExitCode()
 		} else {
-			log.Printf("%s: %s", t.path, e)
+			if !errors.Is(ctx.Err(), context.Canceled) {
+				log.Printf("%s: %s", t.path, e)
+			}
 			failCount++
 			return
 		}
