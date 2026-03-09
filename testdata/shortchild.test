@@ -1,0 +1,15 @@
+# Copyright 2026 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+#
+# This test case starts a child process that prints output after
+# the main test process has ended. As long as the child exits before
+# the time limit, this should work, and the output should be detected.
+#
+# See also longchild.test.
+
+echo Hello
+#>Hello
+
+( sleep 1; echo Good-bye ) &
+
+#>Good-bye

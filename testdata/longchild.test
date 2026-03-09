@@ -1,0 +1,17 @@
+# Copyright 2026 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+#
+# This test case has a child process that hangs around for a long time
+# after the main process has ended. Invigilate should give up on this
+# test case after the timeout expires. It may leave the child process
+# running; that's not perfect, but seems hard to fix.
+#
+# See also shortchild.test.
+
+echo Hello
+#>Hello
+
+( sleep 300 ) &
+
+echo Good-bye
+#>Good-bye
