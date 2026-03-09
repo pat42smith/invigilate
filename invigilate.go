@@ -220,6 +220,44 @@ func reportTest(path string, ch chan<- Test) {
 	ch <- Test{path, string(content), nil}
 }
 
+// attachPipes creates pipes for a command's standard IO
+func attachPipes(cmd *exec.Cmd, test string) (iPipe io.WriteCloser, oPipe, ePipe io.ReadCloser, e error) {
+	defer func() {
+		if e != nil {
+			// This is extremely unlikely. But if and when it happens, we won't start
+			// the command, so the Cmd will not close either end of any of the pipes,
+			// so we must close them ourselves.
+			if iPipe != nil {
+				iPipe.Close()
+				cmd.Stdin.(io.Closer).Close()
+			}
+			if oPipe != nil {
+				oPipe.Close()
+				cmd.Stdout.(io.Closer).Close()
+			}
+			if ePipe != nil {
+				ePipe.Close()
+				cmd.Stderr.(io.Closer).Close()
+			}
+		}
+	}()
+
+	if iPipe, e = cmd.StdinPipe(); e != nil {
+		log.Printf("error opening input pipe for %s: %s", test, e)
+		return
+	}
+	if oPipe, e = cmd.StdoutPipe(); e != nil {
+		log.Printf("error opening output pipe for %s: %s", test, e)
+		return
+	}
+	if ePipe, e = cmd.StderrPipe(); e != nil {
+		log.Printf("error opening error output pipe for %s: %s", test, e)
+		return
+	}
+
+	return
+}
+
 // runTest runs a single test case
 func runTest(t Test, program []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), limit)
@@ -227,36 +265,9 @@ func runTest(t Test, program []string) {
 
 	cmd := exec.CommandContext(ctx, program[0], append(program[1:], t.path)...)
 
-	var iPipe io.WriteCloser
-	var oPipe, ePipe io.ReadCloser
-	pipeError := func(msg string, err error) {
-		log.Printf("error %s for %s: %s", msg, t.path, err)
+	iPipe, oPipe, ePipe, e := attachPipes(cmd, t.path)
+	if e != nil {
 		errorCount++
-		if iPipe != nil {
-			iPipe.Close()
-			cmd.Stdin.(io.Closer).Close()
-		}
-		if oPipe != nil {
-			oPipe.Close()
-			cmd.Stdout.(io.Closer).Close()
-		}
-		if ePipe != nil {
-			ePipe.Close()
-			cmd.Stderr.(io.Closer).Close()
-		}
-	}
-
-	var e error
-	if iPipe, e = cmd.StdinPipe(); e != nil {
-		pipeError("opening input pipe", e)
-		return
-	}
-	if oPipe, e = cmd.StdoutPipe(); e != nil {
-		pipeError("opening output pipe", e)
-		return
-	}
-	if ePipe, e = cmd.StderrPipe(); e != nil {
-		pipeError("opening error output pipe", e)
 		return
 	}
 
