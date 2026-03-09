@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/pat42smith/gotest"
 	"github.com/pat42smith/or"
@@ -252,8 +253,15 @@ func Testee(t *testing.T, invig string) {
 func Children(t *testing.T, invig string) {
 	gotest.Command(invig, "sh", "--", "testdata/shortchild.test").Run(t, "")
 
+	start := time.Now()
 	cmd := gotest.Command(invig, "sh", "--", "testdata/longchild.test")
 	cmd.WantStderr("testdata/longchild.test: time limit exceeded\n1 failed tests\n")
 	cmd.WantCode(1)
 	cmd.Run(t, "")
+	end := time.Now()
+
+	if end.Sub(start) > 4*time.Second {
+		// It looks like we waited for the child process, longer than we should have.
+		t.Errorf("longchild test ran for %s", end.Sub(start))
+	}
 }
