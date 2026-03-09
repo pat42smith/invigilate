@@ -222,26 +222,6 @@ func reportTest(path string, ch chan<- Test) {
 
 // attachPipes creates pipes for a command's standard IO
 func attachPipes(cmd *exec.Cmd, test string) (iPipe io.WriteCloser, oPipe, ePipe io.ReadCloser, e error) {
-	defer func() {
-		if e != nil {
-			// This is extremely unlikely. But if and when it happens, we won't start
-			// the command, so the Cmd will not close either end of any of the pipes,
-			// so we must close them ourselves.
-			if iPipe != nil {
-				iPipe.Close()
-				cmd.Stdin.(io.Closer).Close()
-			}
-			if oPipe != nil {
-				oPipe.Close()
-				cmd.Stdout.(io.Closer).Close()
-			}
-			if ePipe != nil {
-				ePipe.Close()
-				cmd.Stderr.(io.Closer).Close()
-			}
-		}
-	}()
-
 	if iPipe, e = cmd.StdinPipe(); e != nil {
 		log.Printf("error opening input pipe for %s: %s", test, e)
 		return
@@ -267,7 +247,13 @@ func runTest(t Test, program []string) {
 
 	iPipe, oPipe, ePipe, e := attachPipes(cmd, t.path)
 	if e != nil {
+		// This is extremely unlikely. But if and when it happens, we won't start
+		// the command. In this case, https://github.com/golang/go/issues/58369
+		// suggests cancelling the context and then calling Start, which should
+		// release the file descriptors without starting the command.
 		errorCount++
+		cancel()
+		cmd.Start()
 		return
 	}
 
@@ -301,9 +287,6 @@ func runTest(t Test, program []string) {
 
 	fail := func() {
 		failCount++
-		iPipe.Close()
-		oPipe.Close()
-		ePipe.Close()
 		cancel()
 	}
 
