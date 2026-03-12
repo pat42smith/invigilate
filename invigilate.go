@@ -238,6 +238,62 @@ func attachPipes(cmd *exec.Cmd, test string) (iPipe io.WriteCloser, oPipe, ePipe
 	return
 }
 
+var buf = make([]byte, 65536)
+
+// expect tries to match one line of expected output against the output actually
+// received from the test program. The parameters are:
+//
+// pipe: Our end of the pipe to which the test program is writing.
+// what: A description of the pipe from the test program's point of view.
+// .     E.g. "standard output"
+// test: The path to the test file.
+// want: The line we expect to see on the output. Usually, but not always,
+// .     includes a trailing newline, which must be matched.
+// got:  Contains text previously received but not yet matched.
+// fail: To be called on any sort of error.
+//
+// The result indicates whether we successfully matched the expected output.
+func expect(pipe io.ReadCloser, what, test, want string, got *string, fail func(string, error)) bool {
+	for same, done := 0, false; ; {
+		for same < len(want) && same < len(*got) {
+			if want[same] == (*got)[same] {
+				same++
+			} else {
+				have := *got
+				if n := strings.IndexByte(have, '\n'); n >= 0 {
+					have = have[:n+1]
+				}
+				log.Printf("%s: incorrect %s", test, what)
+				log.Printf("expected: %s", want)
+				log.Printf("  actual: %s", have)
+				fail("", nil)
+				return false
+			}
+		}
+		if same >= len(want) {
+			*got = (*got)[len(want):]
+			return true
+		}
+		if done {
+			log.Printf("%s: incomplete %s", test, what)
+			log.Printf("expected: %s", want)
+			log.Printf("  actual: %s", *got)
+			fail("", nil)
+			return false
+		}
+		// TODO: Speed this up; in principle, this is O(N*N). But the strings in question
+		// will generally be short, and we're not likely to be reading data 1 byte at a time.
+		n, e := pipe.Read(buf)
+		*got += string(buf[:n])
+		if e == io.EOF {
+			done = true
+		} else if e != nil {
+			fail("reading "+what, e)
+			return false
+		}
+	}
+}
+
 // runTest runs a single test case
 func runTest(t Test, program []string) {
 	ctx, cancel := context.WithTimeout(context.Background(), limit)
@@ -299,46 +355,6 @@ func runTest(t Test, program []string) {
 		fail()
 	}
 
-	buf := make([]byte, 65536)
-	expect := func(pipe io.ReadCloser, what, want string, got *string) bool {
-		for same, done := 0, false; ; {
-			for same < len(want) && same < len(*got) {
-				if want[same] == (*got)[same] {
-					same++
-				} else {
-					have := *got
-					if n := strings.IndexByte(have, '\n'); n >= 0 {
-						have = have[:n+1]
-					}
-					log.Printf("%s: incorrect %s", t.path, what)
-					log.Printf("expected: %s", want)
-					log.Printf("  actual: %s", have)
-					fail()
-					return false
-				}
-			}
-			if same >= len(want) {
-				*got = (*got)[len(want):]
-				return true
-			}
-			if done {
-				log.Printf("%s: incomplete %s", t.path, what)
-				log.Printf("expected: %s", want)
-				log.Printf("  actual: %s", *got)
-				fail()
-				return false
-			}
-			n, e := pipe.Read(buf)
-			*got += string(buf[:n])
-			if e == io.EOF {
-				done = true
-			} else if e != nil {
-				faile("reading "+what, e)
-				return false
-			}
-		}
-	}
-
 	lines := strings.SplitAfter(t.content, "\n")
 	reads := 0
 	readPrefix := comment + "<"
@@ -385,12 +401,12 @@ func runTest(t Test, program []string) {
 				}
 			}
 		case '>':
-			if !expect(oPipe, "test output", data, &ogot) {
+			if !expect(oPipe, "test output", t.path, data, &ogot, faile) {
 				return
 			}
 		case '!':
 			erred = true
-			if !expect(ePipe, "test error output", data, &egot) {
+			if !expect(ePipe, "test error output", t.path, data, &egot, faile) {
 				return
 			}
 		}
