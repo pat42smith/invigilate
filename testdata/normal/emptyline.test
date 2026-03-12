@@ -1,0 +1,11 @@
+# Copyright 2026 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+
+# Testing an empty line on output (actually just "\n")
+
+echo "line 1"
+echo
+echo "line 3"
+#>line 1
+#>
+#>line 3

@@ -29,6 +29,8 @@ func TestAll(t *testing.T) {
 	t.Run("Error", func(t2 *testing.T) { Error(t2, ex) })
 	t.Run("Testee", func(t2 *testing.T) { Testee(t2, ex) })
 	t.Run("Children", func(t2 *testing.T) { Children(t2, ex) })
+	t.Run("NoProgram", func(t2 *testing.T) { NoProgram(t2, ex) })
+	t.Run("Binary", func(t2 *testing.T) { Binary(t2, ex) })
 }
 
 // Test some invocations with default arguments.
@@ -153,6 +155,11 @@ func Verbose(t *testing.T, invig string) {
 testdata/normal/1second.test
 >Boo!
 
+testdata/normal/emptyline.test
+>line 1
+>
+>line 3
+
 testdata/normal/extraread.test
 >Say something
 !no input
@@ -264,4 +271,22 @@ func Children(t *testing.T, invig string) {
 		// It looks like we waited for the child process, longer than we should have.
 		t.Errorf("longchild test ran for %s", end.Sub(start))
 	}
+}
+
+// Try testing a program that does not exist
+// We want one error message, not one per test
+func NoProgram(t *testing.T, invig string) {
+	cmd := gotest.Command(invig, "/nodir/noprogram", "--", "testdata/normal")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.Count(actual, "/nodir/noprogram: no such file or directory\n") == 1
+	})
+	cmd.Run(t, "")
+}
+
+// Test with binary data
+func Binary(t *testing.T, invig string) {
+	content := or.Fatal1(os.ReadFile("testdata/binary"))(t)
+	gotest.Expect(t, "#>\x00\xff\n", string(content))
+
+	gotest.Command(invig, "sed", "-e", "s/^..//", "--", "testdata/binary").Run(t, "")
 }

@@ -156,6 +156,16 @@ func main() {
 		log.Fatal("No test cases specified")
 	}
 
+	// Find the executable for the program.
+	// If the program doesn't exist, we want to complain just once,
+	// not once per test. Also, we save a tiny bit of time by
+	// not repeating the search for each test.
+	if path, e := exec.LookPath(program[0]); e != nil {
+		log.Fatalf("%s: %s", program[0], e)
+	} else {
+		program[0] = path
+	}
+
 	ch := make(chan Test, 10)
 	go findTests(roots, ch)
 
