@@ -428,7 +428,7 @@ func runTest(t Test, program []string) {
 		n, e := oPipe.Read(buf[:64])
 		ogot = string(buf[:n])
 		if e != nil && !errors.Is(e, io.EOF) {
-			faile("output error", e)
+			faile("error reading stdout", e)
 			return
 		}
 	}
@@ -442,7 +442,7 @@ func runTest(t Test, program []string) {
 		n, e := ePipe.Read(buf[:64])
 		egot = string(buf[:n])
 		if e != nil && !errors.Is(e, io.EOF) {
-			faile("output problem", e)
+			faile("error reading stderr", e)
 			return
 		}
 	}
