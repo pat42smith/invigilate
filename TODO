@@ -9,3 +9,5 @@ Option to run tests in parallel (-j?).
 #=VAR=value to set environment variables.
 
 #- options/arguments (to be appended to the command being tested)
+
+Print "N tests passed" when all succeed. -q option to suppress this.

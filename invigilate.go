@@ -18,9 +18,9 @@ import (
 	"time"
 )
 
-// Function usage prints a usage message to stderr.
+// Function usage prints a usage message to stdout or stderr.
 func usage() {
-	fmt.Fprint(os.Stderr, `
+	fmt.Fprint(flag.CommandLine.Output(), `
 Usage: invigilate [options] program -- files
 
 Program invigilate runs a number of test cases against a single program.
@@ -134,6 +134,7 @@ func main() {
 	flag.Parse()
 
 	if help {
+		flag.CommandLine.SetOutput(os.Stdout)
 		usage()
 		return
 	}

@@ -209,7 +209,7 @@ All tests passed.
 // Check help output
 func Help(t *testing.T, invig string) {
 	cmd := gotest.Command(invig, "-h")
-	cmd.CheckStderr(func(actual string) bool {
+	cmd.CheckStdout(func(actual string) bool {
 		// Since the help text might change often, we'll just do a few simple checks.
 		return len(actual) > 500 &&
 			strings.Contains(actual, "invigilate") &&
