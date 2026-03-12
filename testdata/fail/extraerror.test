@@ -7,3 +7,4 @@
 
 echo "That's wrong!" >&2
 echo "Yes, it is!" >&2
+exit 3
