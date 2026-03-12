@@ -368,6 +368,7 @@ func runTest(t Test, program []string) {
 	erred := false
 	for _, line := range lines {
 		if reads == 0 {
+			// Close stdin as soon as there is nothing more to send.
 			if e := iPipe.Close(); e != nil {
 				faile("closing test input", e)
 				return
