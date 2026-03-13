@@ -66,7 +66,9 @@ standard output and standard error. A test such as:
    #>two
    #!one
 
-will probably succeed.
+will probably succeed. In some cases, however, such a test might block until
+the time limit expires. This is more likely when there is a large amount
+of output.
 
 Invigilate will close the standard input for the test case after it processes
 the last #< line. If there are no #< lines, standard input will be closed
@@ -342,6 +344,11 @@ func runTest(t Test, program []string) {
 	}
 
 	// From here on, cmd.Start and cmd.Wait will close the pipes for us.
+	// We do close our end of each pipe when we are finished with, but that
+	// is not strictly necessary. We must be careful to never use a pipe after
+	// we have closed it; that might cause faile to emit a spurious report
+	// of time limit exceeded.
+	//
 	// Also, any errors occurring after this point will be considered test failures.
 
 	if verbose {
