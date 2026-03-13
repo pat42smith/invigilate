@@ -232,6 +232,9 @@ func reportTest(path string, ch chan<- Test) {
 }
 
 // attachPipes creates pipes for a command's standard IO
+//
+// If an error occurs, the caller will be responsible for closing
+// the pipe file descriptors. See the call site below.
 func attachPipes(cmd *exec.Cmd, test string) (iPipe io.WriteCloser, oPipe, ePipe io.ReadCloser, e error) {
 	if iPipe, e = cmd.StdinPipe(); e != nil {
 		log.Printf("error opening input pipe for %s: %s", test, e)
@@ -317,7 +320,7 @@ func runTest(t Test, program []string) {
 		// This is extremely unlikely. But if and when it happens, we won't start
 		// the command. In this case, https://github.com/golang/go/issues/58369
 		// suggests cancelling the context and then calling Start, which should
-		// release the file descriptors without starting the command.
+		// release the pipe file descriptors without starting the command.
 		errorCount++
 		cancel()
 		cmd.Start()
@@ -435,40 +438,40 @@ func runTest(t Test, program []string) {
 		reads = -1
 	}
 
-	if ogot == "" {
-		n, e := oPipe.Read(buf[:64])
-		ogot = string(buf[:n])
-		if e != nil && !errors.Is(e, io.EOF) {
-			faile("error reading stdout", e)
-			return
+	// Check for extra output, then close the pipe.
+	endOutput := func(pipe io.ReadCloser, which string, got string) bool {
+		if got == "" {
+			// Don't try to read too much output. If the test case spews thousands
+			// of bytes of messages, we don't want to include them all in our error message.
+			n, e := pipe.Read(buf[:64])
+			got = string(buf[:n])
+			if n >= 64 {
+				got += "..."
+			}
+			if e != nil && !errors.Is(e, io.EOF) {
+				faile("error reading "+which, e)
+				return false
+			}
 		}
-	}
-	if ogot != "" {
-		log.Printf("%s: extra output: %s", t.path, ogot)
-		fail()
-		return
+
+		if got != "" {
+			log.Printf("%s: extra output on %s: %s", t.path, which, got)
+			fail()
+			return false
+		}
+
+		if e := pipe.Close(); e != nil {
+			faile("closing test "+which, e)
+			return false
+		}
+
+		return true
 	}
 
-	if egot == "" {
-		n, e := ePipe.Read(buf[:64])
-		egot = string(buf[:n])
-		if e != nil && !errors.Is(e, io.EOF) {
-			faile("error reading stderr", e)
-			return
-		}
-	}
-	if egot != "" {
-		log.Printf("%s: extra error output: %s", t.path, egot)
-		fail()
+	if !endOutput(oPipe, "stdout", ogot) {
 		return
 	}
-
-	if e := oPipe.Close(); e != nil {
-		faile("closing test output", e)
-		return
-	}
-	if e := ePipe.Close(); e != nil {
-		faile("closing test error output", e)
+	if !endOutput(ePipe, "stderr", egot) {
 		return
 	}
 

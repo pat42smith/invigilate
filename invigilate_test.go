@@ -49,7 +49,7 @@ expected: right
   actual: wrong`)
 
 	// This test should have been skipped above; it must fail.
-	mustFail("testdata/normal/skip.sh", `extra output: This test case should not be run`)
+	mustFail("testdata/normal/skip.sh", `extra output on stdout: This test case should not be run`)
 
 	mustFail("testdata/fail/baderror.test", `incorrect test error output
 expected: Nonsense!
@@ -75,9 +75,9 @@ expected: Bobolink
 expected: I'm riding a roller coaster!
   actual: I'm riding a roll`)
 
-	mustFail("testdata/fail/extraoutput.test", `extra output: beta`)
+	mustFail("testdata/fail/extraoutput.test", `extra output on stdout: beta`)
 
-	mustFail("testdata/fail/extraerror.test", `extra error output: Yes, it is!`)
+	mustFail("testdata/fail/extraerror.test", `extra output on stderr: Yes, it is!`)
 
 	cmd := gotest.Command(invig, "sh", "--",
 		"testdata/normal/hello.test",
@@ -127,7 +127,7 @@ func Time(t *testing.T, invig string) {
 // Check the filename extension option
 func Extension(t *testing.T, invig string) {
 	cmd := gotest.Command(invig, "-e", ".sh", "sh", "--", "testdata/normal", "testdata/fail")
-	cmd.WantStderr(`testdata/normal/skip.sh: extra output: This test case should not be run
+	cmd.WantStderr(`testdata/normal/skip.sh: extra output on stdout: This test case should not be run
 1 failed tests
 `)
 	cmd.WantCode(1)
