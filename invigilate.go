@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -14,13 +13,19 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 )
 
-// Function usage prints a usage message to stdout or stderr.
-func usage() {
-	fmt.Fprint(flag.CommandLine.Output(), `
+// Function usage prints a usage message to writer.
+// If writer is nil, os.Stderr is assumed.
+func usage(writer io.Writer) {
+	if writer == nil {
+		writer = os.Stderr
+	}
+
+	fmt.Fprint(writer, `
 Usage: invigilate [options] program -- files
 
 Program invigilate runs a number of test cases against a single program.
@@ -85,10 +90,13 @@ long-lived child process, the child process might be left running even after
 invigilate has finished running the full test suite.
 
 Options:
-
+   -c string     comment delimiter for expected input and output (default #)
+   -e string     test case files have this extension (default .test)
+   -h            print this help information
+   -t duration"  time limit for individual test cases (default 2s = 2 seconds)
+                 (as accepted by https://pkg.go.dev/time#ParseDuration)
+   -v            show verbose output
 `)
-
-	flag.PrintDefaults()
 }
 
 // verbose indicates whether verbose output was requested
@@ -96,11 +104,11 @@ var verbose bool
 
 // Within test case files, lines displaying test input or desired output
 // must begin with comment. Default: "#".
-var comment string
+var comment = "#"
 
 // When searching directories for test case files, only files whose names
 // end with extension are considered. Default: ".test".
-var extension string
+var extension = ".test"
 
 // failCount counts the number of failed tests.
 var failCount = 0
@@ -109,7 +117,7 @@ var failCount = 0
 var errorCount = 0
 
 // limit is the time within which a single test must complete
-var limit time.Duration
+var limit = 2 * time.Second
 
 // Test represents one test case file to be executed or reported as an error.
 type Test struct {
@@ -126,36 +134,72 @@ type Test struct {
 func main() {
 	log.SetFlags(0)
 
-	var help bool
-	flag.StringVar(&comment, "c", "#", "comment delimiter for expected input and output")
-	flag.StringVar(&extension, "e", ".test", "test case files have this extension")
-	flag.BoolVar(&help, "h", false, "print this help information")
-	flag.DurationVar(&limit, "t", 2*time.Second, "time limit for individual test cases")
-	flag.BoolVar(&verbose, "v", false, "show verbose output")
-	flag.CommandLine.Usage = usage
-	flag.Parse()
+	// Process command line flags.
+	// We don't use the standard flag package because it wants to ignore --
+	// immediately after the options. That gets confusing, since we use --
+	// as a separator.
 
-	if help {
-		flag.CommandLine.SetOutput(os.Stdout)
-		usage()
-		return
+	var args []string
+	if len(os.Args) > 0 {
+		args = os.Args[1:]
 	}
 
-	var program, roots []string
-	for k, a := range flag.Args() {
-		if a == "--" {
-			// Allocate a spot for a test name in the program's command line
-			program = make([]string, k, k+1)
-			copy(program, flag.Args()[:k])
-			roots = flag.Args()[k+1:]
+	for len(args) > 0 && len(args[0]) > 0 && args[0][0] == '-' && args[0] != "--" {
+		arg0 := args[0]
+		args = args[1:]
+		switch arg0 {
+		case "-c", "-e", "-t":
+			if len(args) == 0 {
+				usage(nil)
+				log.Println()
+				log.Fatalf("missing value for %s", arg0)
+			}
+			switch arg0 {
+			case "-c":
+				comment = args[0]
+			case "-e":
+				extension = args[0]
+			case "-t":
+				if d, e := time.ParseDuration(args[0]); e != nil {
+					log.Fatal(e)
+				} else {
+					limit = d
+				}
+			}
+			args = args[1:]
+		case "-h", "--h", "-help", "--help":
+			usage(os.Stdout)
+			return
+		case "-v":
+			verbose = true
+		default:
+			usage(nil)
+			log.Println()
+			log.Fatalf("unknown option %s", arg0)
 		}
 	}
+
+	dashes := slices.Index(args, "--")
+	if dashes < 0 {
+		usage(nil)
+		log.Println()
+		log.Fatal("missing -- in arguments")
+	}
+
+	// Allocate a spot for a test name in the program's command line
+	program := make([]string, dashes, dashes+1)
+	copy(program, args[:dashes])
+
+	roots := args[dashes+1:]
+
 	if len(program) == 0 {
-		usage()
-		log.Fatal("No program specified")
+		usage(nil)
+		log.Println()
+		log.Fatal("missing program")
 	} else if len(roots) == 0 {
-		usage()
-		log.Fatal("No test cases specified")
+		usage(nil)
+		log.Println()
+		log.Fatal("missing test cases")
 	}
 
 	// Find the executable for the program.

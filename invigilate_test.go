@@ -31,6 +31,7 @@ func TestAll(t *testing.T) {
 	t.Run("Children", func(t2 *testing.T) { Children(t2, ex) })
 	t.Run("NoProgram", func(t2 *testing.T) { NoProgram(t2, ex) })
 	t.Run("Binary", func(t2 *testing.T) { Binary(t2, ex) })
+	t.Run("Command Line", func(t2 *testing.T) { CommandLine(t2, ex) })
 }
 
 // Test some invocations with default arguments.
@@ -289,4 +290,55 @@ func Binary(t *testing.T, invig string) {
 	gotest.Expect(t, "#>\x00\xff\n", string(content))
 
 	gotest.Command(invig, "sed", "-e", "s/^..//", "--", "testdata/binary").Run(t, "")
+}
+
+// Test various command line errors
+func CommandLine(t *testing.T, invig string) {
+	cmd := gotest.Command(invig)
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.HasPrefix(actual, "\nUsage: ") &&
+			strings.HasSuffix(actual, "\n\nmissing -- in arguments\n")
+	})
+	cmd.Run(t, "")
+
+	// The flag package swallows the first -- after the options;
+	// it's effectively not there.
+	cmd = gotest.Command(invig, "--", "testdata")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.HasPrefix(actual, "\nUsage: ") &&
+			strings.HasSuffix(actual, "\n\nmissing program\n")
+	})
+	cmd.Run(t, "")
+
+	cmd = gotest.Command(invig, "sh", "--")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.HasPrefix(actual, "\nUsage: ") &&
+			strings.HasSuffix(actual, "\n\nmissing test cases\n")
+	})
+	cmd.Run(t, "")
+
+	cmd = gotest.Command(invig, "sh")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.HasPrefix(actual, "\nUsage: ") &&
+			strings.HasSuffix(actual, "\n\nmissing -- in arguments\n")
+	})
+	cmd.Run(t, "")
+
+	// We can use -- as a comment delimiter
+	gotest.Command(invig, "-c", "--", "sed", "-n", "-e", "s/^-->//p", "--", "testdata/dashdash").Run(t, "")
+
+	// Try an invalid duration
+	cmd = gotest.Command(invig, "-t", "1x", "sh", "--", "testdata/normal")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.Contains(actual, `"1x"`)
+	})
+	cmd.Run(t, "")
+
+	// Try an unknown option
+	cmd = gotest.Command(invig, "-r", "sh", "--", "testdata/normal")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.HasPrefix(actual, "\nUsage: ") &&
+			strings.HasSuffix(actual, "\n\nunknown option -r\n")
+	})
+	cmd.Run(t, "")
 }
