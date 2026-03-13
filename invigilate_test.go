@@ -327,6 +327,17 @@ func CommandLine(t *testing.T, invig string) {
 	// We can use -- as a comment delimiter
 	gotest.Command(invig, "-c", "--", "sed", "-n", "-e", "s/^-->//p", "--", "testdata/dashdash").Run(t, "")
 
+	// We can use the empty string as a comment delimiter
+	gotest.Command(invig, "-c", "", "sed", "-n", "-e", "s/^>//p", "--", "testdata/emptycomment").Run(t, "")
+
+	// Missing value for an option
+	cmd = gotest.Command(invig, "-c")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.HasPrefix(actual, "\nUsage: ") &&
+			strings.HasSuffix(actual, "\n\nmissing value for -c\n")
+	})
+	cmd.Run(t, "")
+
 	// Try an invalid duration
 	cmd = gotest.Command(invig, "-t", "1x", "sh", "--", "testdata/normal")
 	cmd.CheckStderr(func(actual string) bool {

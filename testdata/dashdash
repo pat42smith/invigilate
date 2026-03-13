@@ -1,0 +1,6 @@
+# Copyright 2026 Patrick Smith
+# Use of this source code is subject to the MIT-style license in the LICENSE file.
+#
+# Test that we can use -- as a comment indicator.
+
+-->Hello!
