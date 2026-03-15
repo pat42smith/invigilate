@@ -29,9 +29,10 @@ func TestAll(t *testing.T) {
 	t.Run("Error", func(t2 *testing.T) { Error(t2, ex) })
 	t.Run("Testee", func(t2 *testing.T) { Testee(t2, ex) })
 	t.Run("Children", func(t2 *testing.T) { Children(t2, ex) })
-	t.Run("NoProgram", func(t2 *testing.T) { NoProgram(t2, ex) })
+	t.Run("No Program", func(t2 *testing.T) { NoProgram(t2, ex) })
 	t.Run("Binary", func(t2 *testing.T) { Binary(t2, ex) })
 	t.Run("Command Line", func(t2 *testing.T) { CommandLine(t2, ex) })
+	t.Run("Extra Arguments", func(t2 *testing.T) { ExtraArgs(t2, ex) })
 }
 
 // Test some invocations with default arguments.
@@ -350,6 +351,30 @@ func CommandLine(t *testing.T, invig string) {
 	cmd.CheckStderr(func(actual string) bool {
 		return strings.HasPrefix(actual, "\nUsage: ") &&
 			strings.HasSuffix(actual, "\n\nunknown option -r\n")
+	})
+	cmd.Run(t, "")
+}
+
+// Test for extra command arguments specified inside test
+func ExtraArgs(t *testing.T, invig string) {
+	gotest.Command(invig, "-a", "sh", "--",
+		"testdata/extraArgs1.sh",     // Has #-
+		"testdata/normal/hello.test", // Does not have #-
+	).Run(t, "")
+
+	gotest.Command(invig, "-a", "-c", "//", "sed", "--", "testdata/extraArgs2.sed").Run(t, "")
+
+	// Without -a, extra arguments are not processed
+	cmd := gotest.Command(invig, "sh", "--", "testdata/extraArgs1.sh")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.Contains(actual, "expected: + echo Hello") &&
+			strings.HasSuffix(actual, "\n1 failed tests\n")
+	})
+	cmd.Run(t, "")
+
+	cmd = gotest.Command(invig, "-e", "//", "sed", "--", "testdata/extraArgs2.sed")
+	cmd.CheckStderr(func(actual string) bool {
+		return strings.HasSuffix(actual, "\n1 failed tests\n")
 	})
 	cmd.Run(t, "")
 }

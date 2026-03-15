@@ -84,23 +84,33 @@ In addition to input and output, invigilate checks the exit code from the test
 process. If no output on standard error is expected, then a 0 exit code is
 expected. Otherwise, any non-0 exit code is accepted.
 
+If the -a option is given and a test file contains a line beginning with "#-",
+then the rest of the line is divided into words separated by whitespace. These
+words are appended to the command line for that test, before the test filename.
+Multiple #- lines may be used; they are appended in the order they occur.
+Shell-style quoting is not supported.
+
 When the time limit for a test case runs out, invigilate tries to kill the test
 process and proceed with other test cases. If the test case has created a
 long-lived child process, the child process might be left running even after
 invigilate has finished running the full test suite.
 
 Options:
+   -a            allow giving extra arguments with #-
    -c string     comment delimiter for expected input and output (default #)
    -e string     test case files have this extension (default .test)
    -h            print this help information
-   -t duration"  time limit for individual test cases (default 2s = 2 seconds)
+   -t duration   time limit for individual test cases (default 2s = 2 seconds)
                  (as accepted by https://pkg.go.dev/time#ParseDuration)
    -v            show verbose output
 `)
 }
 
+// allowExtraArgs indicates whether to process #- lines
+var allowExtraArgs = false
+
 // verbose indicates whether verbose output was requested
-var verbose bool
+var verbose = false
 
 // Within test case files, lines displaying test input or desired output
 // must begin with comment. Default: "#".
@@ -167,11 +177,13 @@ func main() {
 				}
 			}
 			args = args[1:]
+		case "-a":
+			allowExtraArgs = true
+		case "-v":
+			verbose = true
 		case "-h", "--h", "-help", "--help":
 			usage(os.Stdout)
 			return
-		case "-v":
-			verbose = true
 		default:
 			usage(nil)
 			log.Println()
@@ -187,6 +199,8 @@ func main() {
 	}
 
 	// Allocate a spot for a test name in the program's command line
+	// Note that if we ever switch to multiple worker goroutines for running tests,
+	// this will have to change so those workers don't step on each other's test names.
 	program := make([]string, dashes, dashes+1)
 	copy(program, args[:dashes])
 
@@ -356,10 +370,23 @@ func expect(pipe io.ReadCloser, what, test, want string, got *string, fail func(
 
 // runTest runs a single test case
 func runTest(t Test, program []string) {
+	lines := strings.SplitAfter(t.content, "\n")
+	reads := 0
+	readPrefix := comment + "<"
+	allowPrefix := comment + "-"
+	for _, line := range lines {
+		if strings.HasPrefix(line, readPrefix) {
+			reads++
+		} else if allowExtraArgs && strings.HasPrefix(line, allowPrefix) {
+			program = append(program, strings.Fields(line[len(allowPrefix):])...)
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), limit)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, program[0], append(program[1:], t.path)...)
+	program = append(program, t.path)
+	cmd := exec.CommandContext(ctx, program[0], program[1:]...)
 
 	iPipe, oPipe, ePipe, e := attachPipes(cmd, t.path)
 	if e != nil {
@@ -420,15 +447,6 @@ func runTest(t Test, program []string) {
 		fail()
 	}
 
-	lines := strings.SplitAfter(t.content, "\n")
-	reads := 0
-	readPrefix := comment + "<"
-	for _, line := range lines {
-		if strings.HasPrefix(line, readPrefix) {
-			reads++
-		}
-	}
-
 	var ogot, egot string
 	erred := false
 	for _, line := range lines {
@@ -475,6 +493,8 @@ func runTest(t Test, program []string) {
 			if !expect(ePipe, "test error output", t.path, data, &egot, faile) {
 				return
 			}
+		case '-':
+			// Handled above
 		}
 	}
 

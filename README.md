@@ -13,6 +13,19 @@ echo "Hello, world!"
 
 The comment line beginning with `#>` specifies what should be printed when the test is run.
 
+It is also possible, when invigilate is invoked with the `-a` option,
+to add command line options for individual test cases. For example,
+
+```
+#- -x
+echo Hello
+#!+ echo Hello
+#>Hello
+```
+
+Here, `#- -x` adds -x to the sh command line, and the `#!` line shows
+the extra output expected on standard error.
+
 For more information, run `invigilate -h`.
 
 Use standard Go tools to build invigilate, such as 'go build' or 'go install'.
